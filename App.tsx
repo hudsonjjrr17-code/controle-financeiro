@@ -55,6 +55,7 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('expense');
   const [isModalLocked, setIsModalLocked] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
   // Animation State
   const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
@@ -150,8 +151,21 @@ export default function App() {
     setTransactions([newTransaction, ...transactions]);
   };
 
+  const handleUpdateTransaction = (id: string, amount: number, description: string, category: string, type: TransactionType) => {
+    setTransactions(transactions.map(t => 
+        t.id === id 
+            ? { ...t, amount, description, category, type }
+            : t
+    ));
+  };
+
   const handleDeleteTransaction = (id: string) => {
     setTransactions(transactions.filter(t => t.id !== id));
+  };
+
+  const handleEditRequest = (transaction: Transaction) => {
+      setEditingTransaction(transaction);
+      setIsModalOpen(true);
   };
 
   const handleAddGoal = (goal: SavingsGoal) => {
@@ -167,6 +181,7 @@ export default function App() {
   };
 
   const openAddModal = (type: TransactionType, lockType: boolean = false) => {
+      setEditingTransaction(null); // Clear editing state for new items
       setModalDefaultType(type);
       setIsModalLocked(lockType);
       setIsModalOpen(true);
@@ -354,7 +369,12 @@ export default function App() {
                 </div>
                 <div>
                   {transactions.slice(0, 3).map(t => (
-                    <TransactionItem key={t.id} transaction={t} onDelete={handleDeleteTransaction} />
+                    <TransactionItem 
+                        key={t.id} 
+                        transaction={t} 
+                        onDelete={handleDeleteTransaction}
+                        onEdit={handleEditRequest}
+                    />
                   ))}
                   {transactions.length === 0 && (
                       <p className="text-center text-gray-400 text-sm py-4 bg-white/50 rounded-xl">Nenhuma transação ainda.</p>
@@ -367,7 +387,8 @@ export default function App() {
           {activeTab === 'income' && (
             <WalletView 
                 transactions={transactions} 
-                onDelete={handleDeleteTransaction} 
+                onDelete={handleDeleteTransaction}
+                onEdit={handleEditRequest} 
                 viewMode="income" 
                 onAddTransaction={() => openAddModal('income', true)}
             />
@@ -376,7 +397,8 @@ export default function App() {
           {activeTab === 'expenses' && (
             <WalletView 
                 transactions={transactions} 
-                onDelete={handleDeleteTransaction} 
+                onDelete={handleDeleteTransaction}
+                onEdit={handleEditRequest}
                 viewMode="expense" 
                 onAddTransaction={() => openAddModal('expense', true)}
             />
@@ -448,8 +470,10 @@ export default function App() {
             isOpen={isModalOpen} 
             onClose={() => setIsModalOpen(false)} 
             onAdd={handleAddTransaction}
+            onUpdate={handleUpdateTransaction}
             defaultType={modalDefaultType}
             isTypeLocked={isModalLocked}
+            editingTransaction={editingTransaction}
         />
 
       </div>

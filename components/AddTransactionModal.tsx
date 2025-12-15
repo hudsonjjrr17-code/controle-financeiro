@@ -1,37 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { TransactionType, Category } from '../types';
+import { TransactionType, Category, Transaction } from '../types';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (amount: number, description: string, category: string, type: TransactionType) => void;
+  onUpdate: (id: string, amount: number, description: string, category: string, type: TransactionType) => void;
   defaultType?: TransactionType;
   isTypeLocked?: boolean;
+  editingTransaction?: Transaction | null;
 }
 
 const AddTransactionModal: React.FC<Props> = ({ 
   isOpen, 
   onClose, 
   onAdd, 
+  onUpdate,
   defaultType = 'expense',
-  isTypeLocked = false 
+  isTypeLocked = false,
+  editingTransaction = null
 }) => {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<string>(Category.FOOD);
   const [type, setType] = useState<TransactionType>(defaultType);
 
-  // Reset type when modal opens or defaultType changes
+  // Reset or Load Data
   useEffect(() => {
     if (isOpen) {
-        setType(defaultType);
-        // Reset fields
-        setAmount('');
-        setDescription('');
-        setCategory(Category.FOOD);
+        if (editingTransaction) {
+            // Edit Mode
+            setAmount(editingTransaction.amount.toString());
+            setDescription(editingTransaction.description);
+            setCategory(editingTransaction.category);
+            setType(editingTransaction.type);
+        } else {
+            // Add Mode
+            setType(defaultType);
+            setAmount('');
+            setDescription('');
+            setCategory(Category.FOOD);
+        }
     }
-  }, [isOpen, defaultType]);
+  }, [isOpen, defaultType, editingTransaction]);
 
   if (!isOpen) return null;
 
@@ -51,18 +63,24 @@ const AddTransactionModal: React.FC<Props> = ({
 
     if (!isIncome && !description) return; // Force description for expenses
 
-    onAdd(parseFloat(amount), finalDescription, finalCategory, type);
+    if (editingTransaction) {
+        onUpdate(editingTransaction.id, parseFloat(amount), finalDescription, finalCategory, type);
+    } else {
+        onAdd(parseFloat(amount), finalDescription, finalCategory, type);
+    }
+    
     onClose();
   };
 
   const isIncome = type === 'income';
+  const isEditing = !!editingTransaction;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-300">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-900">
-             {isIncome ? 'Adicionar Valor' : 'Nova Despesa'}
+             {isEditing ? 'Editar Transação' : (isIncome ? 'Adicionar Valor' : 'Nova Despesa')}
           </h2>
           <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
             <X size={20} />
@@ -71,8 +89,8 @@ const AddTransactionModal: React.FC<Props> = ({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* Type Toggle - Only show if NOT locked */}
-          {!isTypeLocked && (
+          {/* Type Toggle - Only show if NOT locked and NOT editing */}
+          {!isTypeLocked && !isEditing && (
             <div className="flex bg-gray-100 p-1 rounded-lg mb-6">
                 <button
                 type="button"
@@ -138,7 +156,7 @@ const AddTransactionModal: React.FC<Props> = ({
             type="submit"
             className={`w-full py-4 text-white font-bold text-lg rounded-xl shadow-lg active:scale-95 transition-transform mt-4 ${isIncome ? 'bg-green-600 shadow-green-200' : 'bg-red-600 shadow-red-200'}`}
           >
-            {isIncome ? 'Confirmar Entrada' : 'Adicionar Despesa'}
+            {isEditing ? 'Salvar Alterações' : (isIncome ? 'Confirmar Entrada' : 'Adicionar Despesa')}
           </button>
         </form>
       </div>

@@ -6,6 +6,7 @@ import { Filter, ArrowDownCircle, ArrowUpCircle, Calendar, Plus } from 'lucide-r
 interface Props {
   transactions: Transaction[];
   onDelete: (id: string) => void;
+  onEdit: (transaction: Transaction) => void;
   viewMode?: 'all' | 'income' | 'expense';
   onAddTransaction?: () => void;
 }
@@ -13,7 +14,7 @@ interface Props {
 type FilterType = 'all' | 'income' | 'expense';
 type DateRangeType = 'all' | 'month' | 'week' | 'custom';
 
-const WalletView: React.FC<Props> = ({ transactions, onDelete, viewMode = 'all', onAddTransaction }) => {
+const WalletView: React.FC<Props> = ({ transactions, onDelete, onEdit, viewMode = 'all', onAddTransaction }) => {
   const [filter, setFilter] = useState<FilterType>(viewMode);
   const [dateRange, setDateRange] = useState<DateRangeType>('all');
   const [customStart, setCustomStart] = useState('');
@@ -193,7 +194,7 @@ const WalletView: React.FC<Props> = ({ transactions, onDelete, viewMode = 'all',
             </div>
         ) : (
             filteredTransactions.map(t => (
-                <TransactionItem key={t.id} transaction={t} onDelete={onDelete} />
+                <TransactionItem key={t.id} transaction={t} onDelete={onDelete} onEdit={onEdit} />
             ))
         )}
       </div>
