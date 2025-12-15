@@ -12,5 +12,8 @@ export default defineConfig(({ mode }) => {
       // Isso permite que o código use process.env.API_KEY no navegador
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
     },
+    build: {
+      chunkSizeWarningLimit: 1600,
+    },
   };
 });

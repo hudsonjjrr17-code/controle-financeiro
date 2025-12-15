@@ -1,25 +1,24 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Plus, LayoutDashboard, Sparkles, PiggyBank, TrendingUp, TrendingDown, Wallet, Target, ArrowRight, DollarSign, LogOut } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { LayoutDashboard, Sparkles, PiggyBank, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, ListFilter, ArrowRightLeft, Plus, Minus } from 'lucide-react';
 import TransactionItem from './components/TransactionItem';
 import AddTransactionModal from './components/AddTransactionModal';
 import AIInsights from './components/AIInsights';
 import WalletView from './components/WalletView';
 import MotivationView from './components/MotivationView';
 import LoginScreen from './components/LoginScreen';
-import { Transaction, Category, TransactionType, ChartDataPoint, SavingsGoal, UserProfile } from './types';
+import { Transaction, TransactionType, ChartDataPoint, SavingsGoal, UserProfile } from './types';
 
 // ZERO Data - Clean State
 const DEFAULT_TRANSACTIONS: Transaction[] = [];
 
-// Red, Black, Gray Palette
-const COLORS = ['#DC2626', '#000000', '#525252', '#A3A3A3', '#EF4444', '#7F1D1D'];
+// Professional Monochrome & Accent Palette
+const COLORS = ['#171717', '#404040', '#737373', '#a3a3a3', '#d4d4d4', '#ef4444'];
 
-type Tab = 'dashboard' | 'income' | 'expenses' | 'motivation' | 'insights';
+type Tab = 'dashboard' | 'extract' | 'motivation' | 'insights';
 
 export default function App() {
   // --- AUTH STATE ---
-  // "user" holds the saved profile from disk (might not be logged in yet)
   const [user, setUser] = useState<UserProfile | null>(() => {
       try {
           const savedUser = localStorage.getItem('user_profile');
@@ -29,7 +28,6 @@ export default function App() {
       }
   });
 
-  // "isAuthenticated" determines if we show the main app
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // --- DATA STATE ---
@@ -51,14 +49,13 @@ export default function App() {
     }
   });
 
+  // UI States
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('expense');
   const [isModalLocked, setIsModalLocked] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  
-  // Animation State
-  const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
+  const [showValues, setShowValues] = useState(true); // Privacy mode
 
   // --- EFFECTS ---
   useEffect(() => {
@@ -69,35 +66,21 @@ export default function App() {
     localStorage.setItem('goals', JSON.stringify(goals));
   }, [goals]);
 
-  // Persist User Profile updates
   useEffect(() => {
      if (user) {
          localStorage.setItem('user_profile', JSON.stringify(user));
      }
   }, [user]);
 
-  // Cycle through dashboard slides
-  useEffect(() => {
-    if (activeTab === 'dashboard') {
-        const interval = setInterval(() => {
-            setCurrentHeroSlide((prev) => (prev + 1) % 4); // 4 Slides total
-        }, 4000);
-        return () => clearInterval(interval);
-    }
-  }, [activeTab]);
-
   // --- HANDLERS ---
-
   const handleLogin = (name: string, password: string) => {
       if (user) {
-          // Login Mode: Check password
           if (user.password === password) {
               setIsAuthenticated(true);
           } else {
-              alert("Senha incorreta. Tente novamente.");
+              alert("Senha incorreta.");
           }
       } else {
-          // Registration Mode
           const newUser: UserProfile = {
               name,
               password,
@@ -109,12 +92,13 @@ export default function App() {
   };
 
   const handleLogout = () => {
-      if (window.confirm("Deseja bloquear o aplicativo?")) {
-          setIsAuthenticated(false); // Just lock, don't delete data
+      if (window.confirm("Bloquear aplicativo?")) {
+          setIsAuthenticated(false);
           setActiveTab('dashboard');
       }
   };
 
+  // Calculations
   const totalBalance = useMemo(() => {
     return transactions.reduce((acc, curr) => {
       return curr.type === 'income' ? acc + curr.amount : acc - curr.amount;
@@ -132,11 +116,14 @@ export default function App() {
       return acc;
     }, {} as Record<string, number>);
 
-    return Object.entries(grouped).map(([name, value], index) => ({
-      name,
-      value,
-      color: COLORS[index % COLORS.length]
-    }));
+    return Object.entries(grouped)
+        .sort((a: [string, number], b: [string, number]) => b[1] - a[1]) // Sort by value desc
+        .slice(0, 5) // Top 5 categories
+        .map(([name, value], index) => ({
+            name,
+            value,
+            color: COLORS[index % COLORS.length]
+        }));
   }, [transactions]);
 
   const handleAddTransaction = (amount: number, description: string, category: string, type: TransactionType) => {
@@ -153,9 +140,7 @@ export default function App() {
 
   const handleUpdateTransaction = (id: string, amount: number, description: string, category: string, type: TransactionType) => {
     setTransactions(transactions.map(t => 
-        t.id === id 
-            ? { ...t, amount, description, category, type }
-            : t
+        t.id === id ? { ...t, amount, description, category, type } : t
     ));
   };
 
@@ -168,314 +153,280 @@ export default function App() {
       setIsModalOpen(true);
   };
 
-  const handleAddGoal = (goal: SavingsGoal) => {
-    setGoals([...goals, goal]);
-  };
-
-  const handleUpdateGoal = (updatedGoal: SavingsGoal) => {
-    setGoals(goals.map(g => g.id === updatedGoal.id ? updatedGoal : g));
-  };
-
-  const handleDeleteGoal = (id: string) => {
-    setGoals(goals.filter(g => g.id !== id));
-  };
-
-  const openAddModal = (type: TransactionType, lockType: boolean = false) => {
-      setEditingTransaction(null); // Clear editing state for new items
+  const openAddModal = (type: TransactionType) => {
+      setEditingTransaction(null);
       setModalDefaultType(type);
-      setIsModalLocked(lockType);
+      setIsModalLocked(true);
       setIsModalOpen(true);
   };
 
-  // Prepare slides data for the animation
-  const heroSlides = [
-    {
-        id: 'balance',
-        label: 'Saldo Disponível',
-        value: `R$ ${totalBalance.toFixed(2)}`,
-        icon: <Wallet size={24} className="text-black" />,
-        bg: 'bg-gray-50',
-        text: 'text-black',
-        border: 'border-gray-200'
-    },
-    {
-        id: 'income',
-        label: 'Receitas do Mês',
-        value: `R$ ${totalIncome.toFixed(2)}`,
-        icon: <TrendingUp size={24} className="text-green-600" />,
-        bg: 'bg-green-50',
-        text: 'text-green-700',
-        border: 'border-green-100'
-    },
-    {
-        id: 'expense',
-        label: 'Despesas do Mês',
-        value: `R$ ${totalExpense.toFixed(2)}`,
-        icon: <TrendingDown size={24} className="text-red-600" />,
-        bg: 'bg-red-50',
-        text: 'text-red-700',
-        border: 'border-red-100'
-    },
-    {
-        id: 'goals',
-        label: 'Total Guardado',
-        value: `R$ ${goals.reduce((acc, g) => acc + g.currentAmount, 0).toFixed(2)}`,
-        icon: <Target size={24} className="text-white" />,
-        bg: 'bg-black',
-        text: 'text-white',
-        border: 'border-gray-800'
-    }
-  ];
+  // Utility to format money
+  const formatMoney = (val: number) => {
+      if (!showValues) return '••••••';
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  };
 
-  // --- RENDER LOGIN IF NOT AUTHENTICATED ---
   if (!isAuthenticated) {
       return (
-        <div className="fixed inset-0 bg-black/5 flex justify-center overflow-hidden">
-            <div className="w-full md:max-w-md h-full bg-white relative md:shadow-2xl md:h-[95vh] md:my-auto md:rounded-[2.5rem] overflow-hidden">
+        <div className="fixed inset-0 bg-zinc-50 flex justify-center overflow-hidden">
+            <div className="w-full md:max-w-md h-full bg-white relative md:shadow-2xl overflow-hidden">
                 <LoginScreen onLogin={handleLogin} existingUser={user} />
             </div>
         </div>
       );
   }
 
-  // --- MAIN APP ---
   return (
-    // FULL SCREEN CONTAINER FOR ANDROID
-    <div className="fixed inset-0 bg-black/5 flex justify-center overflow-hidden">
-      
-      {/* Responsive Container */}
-      <div className="w-full md:max-w-md h-full bg-white flex flex-col relative md:shadow-2xl md:h-[95vh] md:my-auto md:rounded-[2.5rem] overflow-hidden">
+    <div className="fixed inset-0 bg-black/5 flex justify-center overflow-hidden font-sans">
+      <div className="w-full md:max-w-md h-full bg-gray-50/50 flex flex-col relative md:shadow-2xl overflow-hidden">
         
-        {/* BACKGROUND WATERMARK */}
-        <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none overflow-hidden">
-            <DollarSign 
-                size={700} 
-                className="text-red-600 opacity-[0.07] -rotate-12 translate-x-10 translate-y-20" 
-                strokeWidth={1.5} 
-            />
-        </div>
-
-        {/* Header */}
-        <header className="bg-white/95 backdrop-blur-sm pt-[max(2.5rem,env(safe-area-inset-top))] pb-4 px-6 sticky top-0 z-20 border-b border-gray-100 flex-none">
-          <div className="flex justify-between items-center">
-             <div className="flex-1">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                   Controle Financeiro
-                </p>
-                <h1 className="text-2xl font-black text-black tracking-tight leading-none truncate pr-2">
-                   Olá, {user?.name}
-                </h1>
+        {/* TOP BAR */}
+        <header className="bg-white pt-[max(2.5rem,env(safe-area-inset-top))] pb-3 px-6 sticky top-0 z-20 flex-none flex justify-between items-center">
+             <div className="flex flex-col">
+                <span className="text-xs text-gray-500 font-medium">Bom dia,</span>
+                <span className="text-xl font-bold text-gray-900 tracking-tight">{user?.name}</span>
              </div>
              
-             {/* Avatar / Logout */}
              <button 
                 onClick={handleLogout}
-                className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform hover:bg-gray-800"
-                title="Sair / Bloquear"
+                className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors text-gray-600"
              >
-                <LogOut size={16} className="ml-0.5" />
+                <LogOut size={18} />
              </button>
-          </div>
         </header>
 
-        {/* Dashboard Animated Header - Only on Dashboard Tab */}
-        {activeTab === 'dashboard' && (
-           <div className="px-6 py-4 bg-white/0 relative z-10 flex-none mb-2">
-              <div className="relative h-32 w-full">
-                {heroSlides.map((slide, index) => (
-                    <div 
-                        key={slide.id}
-                        className={`absolute inset-0 w-full h-full rounded-2xl p-6 border transition-all duration-700 ease-in-out flex flex-col justify-center shadow-sm ${slide.bg} ${slide.border}
-                        ${index === currentHeroSlide ? 'opacity-100 translate-x-0 scale-100 z-10' : 'opacity-0 translate-x-8 scale-95 z-0'}`}
-                    >
-                        <div className="flex justify-between items-start mb-2">
-                            <p className={`text-xs font-bold uppercase tracking-widest ${index === 3 ? 'text-gray-400' : 'text-gray-500'}`}>{slide.label}</p>
-                            <div className={`${index === 3 ? 'bg-white/20' : 'bg-white'} p-2 rounded-full shadow-sm`}>
-                                {slide.icon}
-                            </div>
-                        </div>
-                        <h2 className={`text-3xl font-black tracking-tight ${slide.text}`}>
-                            {slide.value}
-                        </h2>
-                    </div>
-                ))}
-              </div>
-              
-              {/* Dots Indicator */}
-              <div className="flex justify-center gap-2 mt-4">
-                  {heroSlides.map((_, idx) => (
-                      <div 
-                        key={idx} 
-                        className={`h-1.5 rounded-full transition-all duration-500 ${currentHeroSlide === idx ? 'w-6 bg-black' : 'w-1.5 bg-gray-200'}`}
-                      />
-                  ))}
-              </div>
-           </div>
-        )}
-
-        {/* Main Content */}
-        <main className="flex-1 px-6 pb-28 overflow-y-auto no-scrollbar bg-transparent relative z-10 scroll-smooth">
+        {/* MAIN CONTENT AREA */}
+        <main className="flex-1 overflow-y-auto no-scrollbar pb-24 relative z-10">
           
+          {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
-            <div className="animate-in fade-in duration-300 space-y-6 pt-2">
-              
-              {/* Chart */}
-              <div>
-                  <h3 className="text-lg font-bold text-black mb-4 bg-white/80 inline-block px-2 rounded-lg backdrop-blur-sm">Onde você gastou</h3>
-                  {chartData.length > 0 ? (
-                    <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-4 shadow-sm flex flex-col items-center">
-                      <div className="w-full h-48 relative">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={chartData}
-                              innerRadius={60}
-                              outerRadius={80}
-                              paddingAngle={5}
-                              dataKey="value"
-                            >
-                              {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
-                              ))}
-                            </Pie>
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Saldo Total</span>
-                            <span className="text-lg font-black text-black">R$ {totalBalance.toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2 justify-center mt-6">
-                        {chartData.map((entry) => (
-                            <div key={entry.name} className="flex items-center gap-1.5 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></div>
-                                <span className="text-xs font-bold text-gray-700">{entry.name}</span>
+            <div className="animate-in fade-in duration-300">
+                
+                {/* 1. HERO BALANCE CARD */}
+                <div className="px-6 pt-4 pb-6">
+                    <div className="bg-zinc-900 rounded-[1.75rem] p-6 text-white shadow-xl shadow-zinc-200 relative overflow-hidden group">
+                        {/* Decorative blur */}
+                        <div className="absolute -top-10 -right-10 w-32 h-32 bg-red-600/20 rounded-full blur-3xl group-hover:bg-red-600/30 transition-colors duration-700"></div>
+                        
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-6">
+                                <span className="text-zinc-400 text-xs font-medium tracking-wider uppercase">Saldo Total</span>
+                                <button onClick={() => setShowValues(!showValues)} className="text-zinc-500 hover:text-white transition-colors">
+                                    {showValues ? <Eye size={18} /> : <EyeOff size={18} />}
+                                </button>
                             </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50/90 p-8 rounded-3xl border border-gray-100 text-center text-gray-400 backdrop-blur-sm">
-                        <p>Nenhuma despesa registrada.</p>
-                    </div>
-                  )}
-              </div>
+                            
+                            <div className="mb-8">
+                                <h1 className="text-3xl font-bold tracking-tight mb-1">
+                                    {formatMoney(totalBalance)}
+                                </h1>
+                            </div>
 
-              {/* Recent Transactions */}
-              <div className="pb-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold text-black bg-white/80 px-2 rounded-lg backdrop-blur-sm">Atividade Recente</h3>
-                  <button onClick={() => setActiveTab('expenses')} className="text-xs text-red-600 font-bold px-3 py-1 bg-red-50 rounded-full shadow-sm">Ver Extrato</button>
+                            {/* Mini Stats in Card */}
+                            <div className="flex gap-4">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <div className="w-4 h-4 rounded-full bg-zinc-800 flex items-center justify-center">
+                                            <TrendingUp size={10} className="text-green-400" />
+                                        </div>
+                                        <span className="text-[10px] text-zinc-400 font-medium">Entradas</span>
+                                    </div>
+                                    <p className="text-sm font-semibold text-zinc-200">{formatMoney(totalIncome)}</p>
+                                </div>
+                                <div className="w-[1px] bg-zinc-800"></div>
+                                <div className="flex-1">
+                                     <div className="flex items-center gap-1.5 mb-1">
+                                        <div className="w-4 h-4 rounded-full bg-zinc-800 flex items-center justify-center">
+                                            <TrendingDown size={10} className="text-red-400" />
+                                        </div>
+                                        <span className="text-[10px] text-zinc-400 font-medium">Saídas</span>
+                                    </div>
+                                    <p className="text-sm font-semibold text-zinc-200">{formatMoney(totalExpense)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                  {transactions.slice(0, 3).map(t => (
-                    <TransactionItem 
-                        key={t.id} 
-                        transaction={t} 
-                        onDelete={handleDeleteTransaction}
-                        onEdit={handleEditRequest}
-                    />
-                  ))}
-                  {transactions.length === 0 && (
-                      <p className="text-center text-gray-400 text-sm py-4 bg-white/50 rounded-xl">Nenhuma transação ainda.</p>
-                  )}
+
+                {/* 2. QUICK ACTIONS */}
+                <div className="px-6 mb-8">
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => openAddModal('income')}
+                            className="flex-1 bg-green-50 active:bg-green-100 p-4 rounded-2xl flex flex-col items-center gap-2 border border-green-100 transition-colors"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700">
+                                <Plus size={20} strokeWidth={2.5} />
+                            </div>
+                            <span className="text-xs font-bold text-gray-700">Entrada</span>
+                        </button>
+
+                        <button 
+                            onClick={() => openAddModal('expense')}
+                            className="flex-1 bg-red-50 active:bg-red-100 p-4 rounded-2xl flex flex-col items-center gap-2 border border-red-100 transition-colors"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                                <Minus size={20} strokeWidth={2.5} />
+                            </div>
+                            <span className="text-xs font-bold text-gray-700">Despesa</span>
+                        </button>
+                    </div>
                 </div>
-              </div>
+
+                {/* 3. CHART SECTION */}
+                {chartData.length > 0 && (
+                    <div className="px-6 mb-8">
+                        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+                             <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-gray-900 text-sm">Gastos por Categoria</h3>
+                             </div>
+                             
+                             <div className="flex items-center">
+                                <div className="w-32 h-32 relative">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={chartData}
+                                                innerRadius={45}
+                                                outerRadius={60}
+                                                paddingAngle={4}
+                                                dataKey="value"
+                                                stroke="none"
+                                            >
+                                                {chartData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    {/* Center Text */}
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <span className="text-[10px] font-bold text-gray-400">Top 5</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex-1 ml-4 space-y-2">
+                                    {chartData.slice(0, 3).map((entry) => (
+                                        <div key={entry.name} className="flex justify-between items-center text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></div>
+                                                <span className="text-gray-600 font-medium truncate max-w-[80px]">{entry.name}</span>
+                                            </div>
+                                            <span className="font-bold text-gray-900">{((entry.value / totalExpense) * 100).toFixed(0)}%</span>
+                                        </div>
+                                    ))}
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 4. RECENT TRANSACTIONS HEADER */}
+                <div className="px-6">
+                    <div className="flex justify-between items-end mb-4">
+                        <h3 className="font-bold text-gray-900 text-lg">Últimas</h3>
+                        <button onClick={() => setActiveTab('extract')} className="text-xs font-bold text-red-600 hover:text-red-700">
+                            Ver Extrato Completo
+                        </button>
+                    </div>
+                    <div>
+                         {transactions.slice(0, 4).map(t => (
+                            <TransactionItem 
+                                key={t.id} 
+                                transaction={t} 
+                                onDelete={handleDeleteTransaction}
+                                onEdit={handleEditRequest}
+                            />
+                        ))}
+                        {transactions.length === 0 && (
+                            <div className="text-center py-8 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
+                                <p className="text-sm">Nenhuma movimentação.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
           )}
 
-          {activeTab === 'income' && (
-            <WalletView 
+          {/* EXTRACT TAB (Replaces separate Income/Expense tabs) */}
+          {activeTab === 'extract' && (
+             <WalletView 
                 transactions={transactions} 
-                onDelete={handleDeleteTransaction}
-                onEdit={handleEditRequest} 
-                viewMode="income" 
-                onAddTransaction={() => openAddModal('income', true)}
-            />
-          )}
-
-          {activeTab === 'expenses' && (
-            <WalletView 
-                transactions={transactions} 
-                onDelete={handleDeleteTransaction}
+                onDelete={handleDeleteTransaction} 
                 onEdit={handleEditRequest}
-                viewMode="expense" 
-                onAddTransaction={() => openAddModal('expense', true)}
-            />
+                onAddTransaction={() => openAddModal('expense')}
+             />
           )}
 
+          {/* MOTIVATION/GOALS TAB */}
           {activeTab === 'motivation' && (
-            <MotivationView 
-                totalBalance={totalBalance} 
-                totalIncome={totalIncome} 
-                totalExpense={totalExpense} 
+              <MotivationView 
+                totalBalance={totalBalance}
+                totalIncome={totalIncome}
+                totalExpense={totalExpense}
                 goals={goals}
-                onAddGoal={handleAddGoal}
-                onUpdateGoal={handleUpdateGoal}
-                onDeleteGoal={handleDeleteGoal}
-            />
+                onAddGoal={(g) => setGoals([...goals, g])}
+                onUpdateGoal={(g) => setGoals(goals.map(item => item.id === g.id ? g : item))}
+                onDeleteGoal={(id) => setGoals(goals.filter(item => item.id !== id))}
+              />
           )}
 
+          {/* INSIGHTS TAB */}
           {activeTab === 'insights' && (
-            <AIInsights transactions={transactions} />
+              <div className="px-6 pt-4">
+                  <h2 className="text-2xl font-black text-gray-900 mb-1">Inteligência</h2>
+                  <p className="text-sm text-gray-500 mb-6">Análises personalizadas para você.</p>
+                  <AIInsights transactions={transactions} />
+              </div>
           )}
 
         </main>
 
-        {/* Bottom Navigation */}
-        <nav className="absolute bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 pt-3 flex justify-between items-center z-40 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-5px_15px_rgba(0,0,0,0.02)] overflow-x-auto no-scrollbar">
-          <button 
-            onClick={() => setActiveTab('dashboard')}
-            className={`flex flex-col flex-1 items-center gap-1 p-2 min-w-[60px] rounded-xl transition-all ${activeTab === 'dashboard' ? 'text-red-600 scale-105' : 'text-gray-400 active:scale-95'}`}
-          >
-            <LayoutDashboard size={22} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} />
-            <span className="text-[10px] font-bold whitespace-nowrap">Início</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('income')}
-            className={`flex flex-col flex-1 items-center gap-1 p-2 min-w-[60px] rounded-xl transition-all ${activeTab === 'income' ? 'text-red-600 scale-105' : 'text-gray-400 active:scale-95'}`}
-          >
-            <TrendingUp size={22} strokeWidth={activeTab === 'income' ? 2.5 : 2} />
-            <span className="text-[10px] font-bold whitespace-nowrap">Receitas</span>
-          </button>
+        {/* BOTTOM NAVIGATION - SIMPLIFIED */}
+        <nav className="bg-white border-t border-gray-100 flex justify-between items-center px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 absolute bottom-0 w-full z-40">
+           <button 
+             onClick={() => setActiveTab('dashboard')}
+             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'dashboard' ? 'text-zinc-900' : 'text-gray-400 hover:text-gray-600'}`}
+           >
+             <LayoutDashboard size={24} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} />
+             <span className="text-[10px] font-bold">Início</span>
+           </button>
 
-          <button 
-            onClick={() => setActiveTab('expenses')}
-            className={`flex flex-col flex-1 items-center gap-1 p-2 min-w-[60px] rounded-xl transition-all ${activeTab === 'expenses' ? 'text-red-600 scale-105' : 'text-gray-400 active:scale-95'}`}
-          >
-            <TrendingDown size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />
-            <span className="text-[10px] font-bold whitespace-nowrap">Despesas</span>
-          </button>
+           <button 
+             onClick={() => setActiveTab('extract')}
+             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'extract' ? 'text-zinc-900' : 'text-gray-400 hover:text-gray-600'}`}
+           >
+             <ListFilter size={24} strokeWidth={activeTab === 'extract' ? 2.5 : 2} />
+             <span className="text-[10px] font-bold">Extrato</span>
+           </button>
 
-          <button 
-            onClick={() => setActiveTab('motivation')}
-            className={`flex flex-col flex-1 items-center gap-1 p-2 min-w-[60px] rounded-xl transition-all ${activeTab === 'motivation' ? 'text-red-600 scale-105' : 'text-gray-400 active:scale-95'}`}
-          >
-            <PiggyBank size={22} strokeWidth={activeTab === 'motivation' ? 2.5 : 2} />
-            <span className="text-[10px] font-bold whitespace-nowrap">Guardar</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('insights')}
-            className={`flex flex-col flex-1 items-center gap-1 p-2 min-w-[60px] rounded-xl transition-all ${activeTab === 'insights' ? 'text-red-600 scale-105' : 'text-gray-400 active:scale-95'}`}
-          >
-            <Sparkles size={22} strokeWidth={activeTab === 'insights' ? 2.5 : 2} />
-            <span className="text-[10px] font-bold whitespace-nowrap">Dicas</span>
-          </button>
+           <button 
+             onClick={() => setActiveTab('motivation')}
+             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'motivation' ? 'text-zinc-900' : 'text-gray-400 hover:text-gray-600'}`}
+           >
+             <PiggyBank size={24} strokeWidth={activeTab === 'motivation' ? 2.5 : 2} />
+             <span className="text-[10px] font-bold">Metas</span>
+           </button>
+
+           <button 
+             onClick={() => setActiveTab('insights')}
+             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'insights' ? 'text-zinc-900' : 'text-gray-400 hover:text-gray-600'}`}
+           >
+             <Sparkles size={24} strokeWidth={activeTab === 'insights' ? 2.5 : 2} />
+             <span className="text-[10px] font-bold">Dicas</span>
+           </button>
         </nav>
 
-        {/* Modals */}
+        {/* Modal */}
         <AddTransactionModal 
-            isOpen={isModalOpen} 
-            onClose={() => setIsModalOpen(false)} 
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
             onAdd={handleAddTransaction}
             onUpdate={handleUpdateTransaction}
             defaultType={modalDefaultType}
             isTypeLocked={isModalLocked}
             editingTransaction={editingTransaction}
         />
-
       </div>
     </div>
   );

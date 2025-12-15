@@ -1,10 +1,10 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, FinancialInsight } from "../types";
 
-// Initialize Gemini Client
+// Initialize Gemini Client (default instance)
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// MOCK DATA FOR DEMO MODE (Fallback when no Key is present)
+// MOCK DATA FOR DEMO MODE
 const MOCK_INSIGHTS: FinancialInsight[] = [
   {
     title: "Modo Demonstração",
@@ -31,7 +31,6 @@ const MOCK_QUOTES = [
 ];
 
 export const generateFinancialInsights = async (transactions: Transaction[]): Promise<FinancialInsight[]> => {
-  // 1. Check Internet Connection (Critical for Mobile)
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return [
       {
@@ -42,9 +41,7 @@ export const generateFinancialInsights = async (transactions: Transaction[]): Pr
     ];
   }
 
-  // 2. Demo Mode (Fallback if API Key is missing)
   if (!process.env.API_KEY) {
-    // Return mock data with a small delay to simulate network request
     await new Promise(resolve => setTimeout(resolve, 1500));
     return transactions.length > 0 ? MOCK_INSIGHTS : [MOCK_INSIGHTS[0]];
   }
@@ -59,7 +56,6 @@ export const generateFinancialInsights = async (transactions: Transaction[]): Pr
     ];
   }
 
-  // Prepare simplified data
   const recentTransactions = transactions.slice(0, 30).map(t => ({
     d: t.date.split('T')[0],
     t: t.type === 'income' ? 'Entrada' : 'Saída',
@@ -98,7 +94,7 @@ export const generateFinancialInsights = async (transactions: Transaction[]): Pr
     });
 
     const text = response.text;
-    if (!text) return MOCK_INSIGHTS; // Fallback to mock on empty response
+    if (!text) return MOCK_INSIGHTS;
     
     const insights = JSON.parse(text) as FinancialInsight[];
     return insights;
@@ -116,12 +112,10 @@ export const generateFinancialInsights = async (transactions: Transaction[]): Pr
 };
 
 export const generateMotivationalQuote = async (balance: number, savingsRate: number): Promise<string> => {
-  // Check Connection
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return "Sua liberdade financeira depende de você.";
   }
 
-  // Demo Mode
   if (!process.env.API_KEY) {
     return MOCK_QUOTES[Math.floor(Math.random() * MOCK_QUOTES.length)];
   }
@@ -144,4 +138,44 @@ export const generateMotivationalQuote = async (balance: number, savingsRate: nu
   } catch (e) {
     return "O futuro é construído com as escolhas de hoje.";
   }
-}
+};
+
+export const generateVideo = async (imageBase64: string, mimeType: string, prompt: string, aspectRatio: '16:9' | '9:16'): Promise<string> => {
+  // Check if API key is selected (Required for Veo)
+  if (typeof window !== 'undefined' && (window as any).aistudio) {
+      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+          await (window as any).aistudio.openSelectKey();
+      }
+  }
+
+  // Use a fresh instance with the latest key as per guidelines
+  const freshAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  let operation = await freshAi.models.generateVideos({
+    model: 'veo-3.1-fast-generate-preview',
+    prompt: prompt,
+    image: {
+      imageBytes: imageBase64,
+      mimeType: mimeType, 
+    },
+    config: {
+      numberOfVideos: 1,
+      resolution: '720p',
+      aspectRatio: aspectRatio
+    }
+  });
+
+  while (!operation.done) {
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    operation = await freshAi.operations.getVideosOperation({operation: operation});
+  }
+
+  const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+  if (!videoUri) {
+      throw new Error("Não foi possível gerar o vídeo. Tente novamente.");
+  }
+  
+  // Return URL with API key appended for playback
+  return `${videoUri}&key=${process.env.API_KEY}`;
+};

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, ArrowRight, ShieldCheck, Lock, User, PlusCircle, Smartphone, Share } from 'lucide-react';
+import { DollarSign, ArrowRight, ShieldCheck, Lock, User, Download, Smartphone, Share, CheckCircle2 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { Capacitor } from '@capacitor/core';
 
@@ -12,8 +12,12 @@ const LoginScreen: React.FC<Props> = ({ onLogin, existingUser }) => {
   const [name, setName] = useState(existingUser?.name || '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  
+  // PWA Install State
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   const isRegistering = !existingUser;
   // Check if running on Web (Vercel) or Native (Android app)
@@ -24,21 +28,34 @@ const LoginScreen: React.FC<Props> = ({ onLogin, existingUser }) => {
     const userAgent = window.navigator.userAgent.toLowerCase();
     setIsIOS(/iphone|ipad|ipod/.test(userAgent));
 
+    // Check if already installed (standalone mode)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) {
+        setIsInstalled(true);
+    }
+
     // Listen for PWA install event (Android/Chrome mainly)
     const handler = (e: any) => {
       e.preventDefault();
       setInstallPrompt(e);
+      // Optional: Auto-show instructions if desired, but button is better
     };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   const handleInstallClick = async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setInstallPrompt(null);
+    // Logic 1: Use Native Prompt if available (Android/Chrome)
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallPrompt(null);
+        setIsInstalled(true);
+      }
+    } else {
+      // Logic 2: Fallback to showing instructions (iOS or Desktop without prompt)
+      setShowInstructions(!showInstructions);
     }
   };
 
@@ -164,60 +181,76 @@ const LoginScreen: React.FC<Props> = ({ onLogin, existingUser }) => {
           )}
         </form>
 
-        {/* Installation Options - WEB ONLY */}
-        {isWeb && (
+        {/* INSTALLATION BUTTON - VISIBLE ON WEB */}
+        {isWeb && !isInstalled && (
             <div className="mt-8 pt-6 border-t border-dashed border-gray-200 space-y-3">
                 
-                {/* 1. Android/Chrome Install Button (Recommended) */}
-                {installPrompt && (
-                    <button
-                        onClick={handleInstallClick}
-                        className="w-full flex items-center justify-between p-4 bg-gray-900 text-white rounded-xl shadow-lg hover:bg-gray-800 transition-all active:scale-95 group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="bg-white/20 p-2 rounded-lg group-hover:bg-white/30 transition-colors">
-                                <PlusCircle size={20} />
-                            </div>
-                            <div className="text-left">
-                                <p className="text-[10px] font-medium text-gray-300 uppercase tracking-wider">Para Android</p>
-                                <p className="font-bold text-sm">Instalar Aplicativo</p>
-                            </div>
+                {/* Main Action Button */}
+                <button
+                    onClick={handleInstallClick}
+                    className="w-full flex items-center justify-between p-4 bg-gray-900 text-white rounded-xl shadow-lg hover:bg-gray-800 transition-all active:scale-95 group"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white/20 p-2 rounded-lg group-hover:bg-white/30 transition-colors">
+                            <Download size={20} />
                         </div>
-                        <ArrowRight size={18} className="text-gray-400" />
-                    </button>
-                )}
-
-                {/* 2. iOS Instructions */}
-                {isIOS && (
-                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center gap-3">
-                        <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
-                           <Share size={20} />
-                        </div>
-                        <div>
-                           <p className="text-xs font-bold text-gray-900">Para iPhone (iOS):</p>
-                           <p className="text-[10px] text-gray-500">
-                               Toque no botão <b>Compartilhar</b> <Share size={10} className="inline"/> e escolha <b>"Adicionar à Tela de Início"</b>.
-                           </p>
-                        </div>
-                   </div>
-                )}
-
-                {/* 3. Fallback Instructions (Se não for iOS e não tiver prompt) */}
-                {!installPrompt && !isIOS && (
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center gap-3">
-                         <div className="bg-gray-200 p-2 rounded-lg text-gray-600">
-                            <Smartphone size={20} />
-                         </div>
-                         <div>
-                            <p className="text-xs font-bold text-gray-900">Como instalar:</p>
-                            <p className="text-[10px] text-gray-500">
-                                No menu do navegador, clique em <b>"Instalar aplicativo"</b> ou <b>"Adicionar à tela inicial"</b>.
+                        <div className="text-left">
+                            <p className="text-[10px] font-medium text-gray-300 uppercase tracking-wider">
+                                {isIOS ? 'Para iPhone' : 'Para Android'}
                             </p>
-                         </div>
+                            <p className="font-bold text-sm">Baixar Aplicativo</p>
+                        </div>
+                    </div>
+                    <ArrowRight size={18} className={`text-gray-400 transition-transform ${showInstructions ? 'rotate-90' : ''}`} />
+                </button>
+
+                {/* Instructions Box (Shows if prompt fails or iOS) */}
+                {(showInstructions || (isIOS && !installPrompt)) && (
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 animate-in slide-in-from-top-2">
+                       {isIOS ? (
+                           // iOS Instructions
+                           <div className="flex gap-3">
+                                <div className="bg-blue-100 p-2 rounded-lg text-blue-600 h-fit">
+                                   <Share size={20} />
+                                </div>
+                                <div>
+                                   <p className="text-xs font-bold text-gray-900 mb-1">Como instalar no iPhone:</p>
+                                   <ol className="text-[11px] text-gray-600 space-y-1 list-decimal ml-3">
+                                       <li>Toque no botão <b>Compartilhar</b> <Share size={10} className="inline"/> abaixo.</li>
+                                       <li>Role para baixo e toque em <b>Adicionar à Tela de Início</b>.</li>
+                                       <li>Confirme clicando em <b>Adicionar</b>.</li>
+                                   </ol>
+                                </div>
+                           </div>
+                       ) : (
+                           // Android/Other Instructions
+                           <div className="flex gap-3">
+                                <div className="bg-gray-200 p-2 rounded-lg text-gray-600 h-fit">
+                                   <Smartphone size={20} />
+                                </div>
+                                <div>
+                                   <p className="text-xs font-bold text-gray-900 mb-1">Instalação Manual:</p>
+                                   <p className="text-[11px] text-gray-600">
+                                       No menu do seu navegador (três pontinhos), procure por <b>"Instalar aplicativo"</b> ou <b>"Adicionar à tela inicial"</b>.
+                                   </p>
+                                </div>
+                           </div>
+                       )}
                     </div>
                 )}
             </div>
         )}
+
+        {/* Already Installed Badge */}
+        {isInstalled && (
+            <div className="mt-8 pt-6 border-t border-dashed border-gray-200 flex justify-center">
+                 <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold">
+                    <CheckCircle2 size={16} />
+                    App Instalado
+                 </div>
+            </div>
+        )}
+
       </div>
 
       <div className="p-6 text-center z-10">
