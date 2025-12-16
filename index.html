@@ -9,19 +9,41 @@
     <link rel="manifest" href="/manifest.json" />
     <title>Controle Financeiro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Roboto Font for Android Native Feel -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Roboto for UI, Playfair Display for Titles ("Letras Bonitas") -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
               sans: ['Roboto', 'sans-serif'],
+              serif: ['"Playfair Display"', 'serif'], // New elegant font
             },
             colors: {
               primary: '#DC2626', // Red 600
               secondary: '#000000', // Pure Black
               dark: '#111827', // Gray 900
+            },
+            animation: {
+              'enter': 'enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'fade': 'fade 0.4s ease-out forwards',
+              'blob': 'blob 15s infinite alternate', // Slower, alternating movement
+            },
+            keyframes: {
+              enter: {
+                '0%': { opacity: '0', transform: 'translateY(10px) scale(0.98)' },
+                '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+              },
+              fade: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              blob: {
+                '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                '100%': { transform: 'translate(0px, 0px) scale(1)' },
+              }
             }
           }
         }
@@ -47,6 +69,28 @@
       /* Native Input Feel */
       input, select, textarea, button {
         font-size: 16px !important; /* Prevents iOS/Android zoom on focus */
+      }
+
+      /* Stagger delays helper */
+      .delay-100 { animation-delay: 100ms; }
+      .delay-200 { animation-delay: 200ms; }
+      .delay-300 { animation-delay: 300ms; }
+      .delay-400 { animation-delay: 400ms; }
+      .animation-delay-2000 { animation-delay: 2s; }
+      .animation-delay-4000 { animation-delay: 4s; }
+      
+      /* Subtle Grid Pattern */
+      .bg-grid-pattern {
+        background-image: linear-gradient(to right, #f3f4f6 1px, transparent 1px),
+                          linear-gradient(to bottom, #f3f4f6 1px, transparent 1px);
+        background-size: 40px 40px;
+        mask-image: linear-gradient(to bottom, transparent, black, transparent);
+        -webkit-mask-image: linear-gradient(to bottom, transparent 5%, black 40%, black 70%, transparent 95%);
+      }
+
+      /* Ensure elements are hidden before animation starts */
+      .animate-enter {
+        opacity: 0;
       }
     </style>
   <script type="importmap">

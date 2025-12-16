@@ -89,33 +89,26 @@ const LoginScreen: React.FC<Props> = ({ onLogin, existingUser }) => {
       </div>
 
       <div className="flex-1 flex flex-col justify-center px-8 z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
-        <div className="mb-8">
-            <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-red-100">
-                <span className="text-white font-bold text-xl">CF</span>
-            </div>
+        <div className="mb-10">
+            {/* Main Title Replaced as Requested */}
+            <h1 className="text-4xl md:text-5xl font-serif font-black text-gray-900 mb-3 tracking-tight leading-tight">
+              Controle <br/> 
+              <span className="text-red-600 italic">Financeiro</span>
+            </h1>
             
+            {/* Subtitle handles context */}
             {isRegistering ? (
-                <>
-                    <h1 className="text-4xl font-black text-gray-900 mb-2 tracking-tight">
-                    Criar <br/> <span className="text-red-600">Conta</span>
-                    </h1>
-                    <p className="text-gray-500 font-medium">
-                    Comece a controlar suas finanças hoje mesmo.
-                    </p>
-                </>
+                <p className="text-gray-500 font-medium">
+                  Crie sua conta para começar a organizar sua vida.
+                </p>
             ) : (
-                <>
-                    <h1 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">
-                    Bem-vindo, <br/> <span className="text-red-600">{existingUser.name}</span>
-                    </h1>
-                    <p className="text-gray-500 font-medium">
-                    Digite sua senha para acessar.
-                    </p>
-                </>
+                <p className="text-gray-500 font-medium">
+                  Bem-vindo de volta, <span className="font-bold text-gray-800">{existingUser.name}</span>.
+                </p>
             )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           
           {/* Name Input - Only show if registering */}
           {isRegistering && (

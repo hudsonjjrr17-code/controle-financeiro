@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { LayoutDashboard, Sparkles, PiggyBank, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, ListFilter, ArrowRightLeft, Plus, Minus } from 'lucide-react';
 import TransactionItem from './components/TransactionItem';
@@ -16,6 +16,60 @@ const DEFAULT_TRANSACTIONS: Transaction[] = [];
 const COLORS = ['#171717', '#404040', '#737373', '#a3a3a3', '#d4d4d4', '#ef4444'];
 
 type Tab = 'dashboard' | 'extract' | 'motivation' | 'insights';
+
+// --- ANIMATED NUMBER COMPONENT ---
+const AnimatedNumber = ({ value, isCurrency = true, show = true }: { value: number, isCurrency?: boolean, show?: boolean }) => {
+    const [displayValue, setDisplayValue] = useState(0);
+    const [hasStarted, setHasStarted] = useState(false);
+
+    useEffect(() => {
+        setHasStarted(true);
+        let startTimestamp: number | null = null;
+        const duration = 1500; // 1.5s for smooth roll up
+        const startValue = displayValue; // Start from current (or 0 initially)
+        
+        const step = (timestamp: number) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            
+            // Ease Out Expo for premium feel
+            const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+            
+            const current = startValue + (value - startValue) * ease;
+            setDisplayValue(current);
+            
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            }
+        };
+        
+        window.requestAnimationFrame(step);
+    }, [value]); // Re-run when value changes
+
+    if (!show) return <span className="tracking-tighter">••••••</span>;
+
+    const formatted = isCurrency 
+        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayValue)
+        : Math.round(displayValue).toString();
+
+    return <span className="tracking-tighter tabular-nums">{formatted}</span>;
+};
+
+// --- ANIMATED BACKGROUND COMPONENT ---
+const AnimatedBackground = () => (
+    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-zinc-50">
+        {/* Static Grid Pattern */}
+        <div className="absolute inset-0 bg-grid-pattern opacity-60"></div>
+
+        {/* Floating Gradient Blobs */}
+        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-red-100/40 rounded-full mix-blend-multiply filter blur-[80px] animate-blob"></div>
+        <div className="absolute top-[20%] left-[-20%] w-[400px] h-[400px] bg-gray-200/50 rounded-full mix-blend-multiply filter blur-[60px] animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-[-20%] left-[20%] w-[600px] h-[600px] bg-slate-100/60 rounded-full mix-blend-multiply filter blur-[100px] animate-blob animation-delay-4000"></div>
+        
+        {/* Soft Noise/Texture Overlay (Optional via CSS, here using slight opacity blending) */}
+        <div className="absolute inset-0 bg-white/30 backdrop-blur-[1px]"></div>
+    </div>
+);
 
 export default function App() {
   // --- AUTH STATE ---
@@ -92,10 +146,9 @@ export default function App() {
   };
 
   const handleLogout = () => {
-      if (window.confirm("Bloquear aplicativo?")) {
-          setIsAuthenticated(false);
-          setActiveTab('dashboard');
-      }
+      // Instant logout (Lock screen) without confirmation to ensure responsiveness
+      setIsAuthenticated(false);
+      setActiveTab('dashboard');
   };
 
   // Calculations
@@ -160,12 +213,6 @@ export default function App() {
       setIsModalOpen(true);
   };
 
-  // Utility to format money
-  const formatMoney = (val: number) => {
-      if (!showValues) return '••••••';
-      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  };
-
   if (!isAuthenticated) {
       return (
         <div className="fixed inset-0 bg-zinc-50 flex justify-center overflow-hidden">
@@ -178,18 +225,22 @@ export default function App() {
 
   return (
     <div className="fixed inset-0 bg-black/5 flex justify-center overflow-hidden font-sans">
-      <div className="w-full md:max-w-md h-full bg-gray-50/50 flex flex-col relative md:shadow-2xl overflow-hidden">
+      <div className="w-full md:max-w-md h-full bg-white/60 flex flex-col relative md:shadow-2xl overflow-hidden">
         
+        {/* ANIMATED BACKGROUND */}
+        <AnimatedBackground />
+
         {/* TOP BAR */}
-        <header className="bg-white pt-[max(2.5rem,env(safe-area-inset-top))] pb-3 px-6 sticky top-0 z-20 flex-none flex justify-between items-center">
-             <div className="flex flex-col">
-                <span className="text-xs text-gray-500 font-medium">Bom dia,</span>
-                <span className="text-xl font-bold text-gray-900 tracking-tight">{user?.name}</span>
+        <header className="bg-white/70 backdrop-blur-md pt-[max(2.5rem,env(safe-area-inset-top))] pb-3 px-6 sticky top-0 z-20 flex-none flex justify-between items-center transition-all border-b border-gray-100/50">
+             <div className="flex flex-col animate-enter">
+                <h1 className="text-xl font-serif font-black text-gray-900 tracking-tight leading-none">Controle Financeiro</h1>
+                <span className="text-xs text-gray-500 font-medium mt-0.5">Olá, {user?.name}</span>
              </div>
              
              <button 
                 onClick={handleLogout}
-                className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors text-gray-600"
+                className="p-2 bg-gray-100/80 rounded-full hover:bg-gray-200 transition-colors text-gray-600 animate-enter"
+                aria-label="Sair"
              >
                 <LogOut size={18} />
              </button>
@@ -200,11 +251,11 @@ export default function App() {
           
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
-            <div className="animate-in fade-in duration-300">
+            <div key="dashboard">
                 
                 {/* 1. HERO BALANCE CARD */}
-                <div className="px-6 pt-4 pb-6">
-                    <div className="bg-zinc-900 rounded-[1.75rem] p-6 text-white shadow-xl shadow-zinc-200 relative overflow-hidden group">
+                <div className="px-6 pt-4 pb-6 animate-enter">
+                    <div className="bg-zinc-900 rounded-[1.75rem] p-6 text-white shadow-xl shadow-zinc-200 relative overflow-hidden group transform transition-transform duration-500 hover:scale-[1.02]">
                         {/* Decorative blur */}
                         <div className="absolute -top-10 -right-10 w-32 h-32 bg-red-600/20 rounded-full blur-3xl group-hover:bg-red-600/30 transition-colors duration-700"></div>
                         
@@ -218,7 +269,7 @@ export default function App() {
                             
                             <div className="mb-8">
                                 <h1 className="text-3xl font-bold tracking-tight mb-1">
-                                    {formatMoney(totalBalance)}
+                                    <AnimatedNumber value={totalBalance} show={showValues} />
                                 </h1>
                             </div>
 
@@ -231,7 +282,9 @@ export default function App() {
                                         </div>
                                         <span className="text-[10px] text-zinc-400 font-medium">Entradas</span>
                                     </div>
-                                    <p className="text-sm font-semibold text-zinc-200">{formatMoney(totalIncome)}</p>
+                                    <p className="text-sm font-semibold text-zinc-200">
+                                        <AnimatedNumber value={totalIncome} show={showValues} />
+                                    </p>
                                 </div>
                                 <div className="w-[1px] bg-zinc-800"></div>
                                 <div className="flex-1">
@@ -241,7 +294,9 @@ export default function App() {
                                         </div>
                                         <span className="text-[10px] text-zinc-400 font-medium">Saídas</span>
                                     </div>
-                                    <p className="text-sm font-semibold text-zinc-200">{formatMoney(totalExpense)}</p>
+                                    <p className="text-sm font-semibold text-zinc-200">
+                                        <AnimatedNumber value={totalExpense} show={showValues} />
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -249,13 +304,13 @@ export default function App() {
                 </div>
 
                 {/* 2. QUICK ACTIONS */}
-                <div className="px-6 mb-8">
+                <div className="px-6 mb-8 animate-enter delay-100">
                     <div className="flex gap-3">
                         <button 
                             onClick={() => openAddModal('income')}
-                            className="flex-1 bg-green-50 active:bg-green-100 p-4 rounded-2xl flex flex-col items-center gap-2 border border-green-100 transition-colors"
+                            className="flex-1 bg-green-50/80 backdrop-blur-sm active:bg-green-100 p-4 rounded-2xl flex flex-col items-center gap-2 border border-green-100 transition-colors active:scale-95 duration-200"
                         >
-                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700">
+                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 shadow-sm">
                                 <Plus size={20} strokeWidth={2.5} />
                             </div>
                             <span className="text-xs font-bold text-gray-700">Entrada</span>
@@ -263,9 +318,9 @@ export default function App() {
 
                         <button 
                             onClick={() => openAddModal('expense')}
-                            className="flex-1 bg-red-50 active:bg-red-100 p-4 rounded-2xl flex flex-col items-center gap-2 border border-red-100 transition-colors"
+                            className="flex-1 bg-red-50/80 backdrop-blur-sm active:bg-red-100 p-4 rounded-2xl flex flex-col items-center gap-2 border border-red-100 transition-colors active:scale-95 duration-200"
                         >
-                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 shadow-sm">
                                 <Minus size={20} strokeWidth={2.5} />
                             </div>
                             <span className="text-xs font-bold text-gray-700">Despesa</span>
@@ -275,8 +330,8 @@ export default function App() {
 
                 {/* 3. CHART SECTION */}
                 {chartData.length > 0 && (
-                    <div className="px-6 mb-8">
-                        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+                    <div className="px-6 mb-8 animate-enter delay-200">
+                        <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-5 shadow-sm border border-gray-100">
                              <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-gray-900 text-sm">Gastos por Categoria</h3>
                              </div>
@@ -292,6 +347,8 @@ export default function App() {
                                                 paddingAngle={4}
                                                 dataKey="value"
                                                 stroke="none"
+                                                animationDuration={1500}
+                                                animationBegin={200}
                                             >
                                                 {chartData.map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -306,8 +363,8 @@ export default function App() {
                                 </div>
                                 
                                 <div className="flex-1 ml-4 space-y-2">
-                                    {chartData.slice(0, 3).map((entry) => (
-                                        <div key={entry.name} className="flex justify-between items-center text-xs">
+                                    {chartData.slice(0, 3).map((entry, i) => (
+                                        <div key={entry.name} className="flex justify-between items-center text-xs" style={{ animationDelay: `${300 + (i * 100)}ms` }}>
                                             <div className="flex items-center gap-2">
                                                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></div>
                                                 <span className="text-gray-600 font-medium truncate max-w-[80px]">{entry.name}</span>
@@ -322,7 +379,7 @@ export default function App() {
                 )}
 
                 {/* 4. RECENT TRANSACTIONS HEADER */}
-                <div className="px-6">
+                <div className="px-6 animate-enter delay-300">
                     <div className="flex justify-between items-end mb-4">
                         <h3 className="font-bold text-gray-900 text-lg">Últimas</h3>
                         <button onClick={() => setActiveTab('extract')} className="text-xs font-bold text-red-600 hover:text-red-700">
@@ -330,16 +387,17 @@ export default function App() {
                         </button>
                     </div>
                     <div>
-                         {transactions.slice(0, 4).map(t => (
-                            <TransactionItem 
-                                key={t.id} 
-                                transaction={t} 
-                                onDelete={handleDeleteTransaction}
-                                onEdit={handleEditRequest}
-                            />
+                         {transactions.slice(0, 4).map((t, i) => (
+                            <div key={t.id} className="mb-2 last:mb-0 animate-enter" style={{ animationDelay: `${400 + (i * 50)}ms` }}>
+                                <TransactionItem 
+                                    transaction={t} 
+                                    onDelete={handleDeleteTransaction}
+                                    onEdit={handleEditRequest}
+                                />
+                            </div>
                         ))}
                         {transactions.length === 0 && (
-                            <div className="text-center py-8 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
+                            <div className="text-center py-8 text-gray-400 bg-white/50 backdrop-blur-sm rounded-2xl border border-dashed border-gray-200">
                                 <p className="text-sm">Nenhuma movimentação.</p>
                             </div>
                         )}
@@ -373,7 +431,7 @@ export default function App() {
 
           {/* INSIGHTS TAB */}
           {activeTab === 'insights' && (
-              <div className="px-6 pt-4">
+              <div className="px-6 pt-4 animate-enter">
                   <h2 className="text-2xl font-black text-gray-900 mb-1">Inteligência</h2>
                   <p className="text-sm text-gray-500 mb-6">Análises personalizadas para você.</p>
                   <AIInsights transactions={transactions} />
@@ -383,10 +441,10 @@ export default function App() {
         </main>
 
         {/* BOTTOM NAVIGATION - SIMPLIFIED */}
-        <nav className="bg-white border-t border-gray-100 flex justify-between items-center px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 absolute bottom-0 w-full z-40">
+        <nav className="bg-white/80 backdrop-blur-lg border-t border-gray-100/50 flex justify-between items-center px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 absolute bottom-0 w-full z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
            <button 
              onClick={() => setActiveTab('dashboard')}
-             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'dashboard' ? 'text-zinc-900' : 'text-gray-400 hover:text-gray-600'}`}
+             className={`flex flex-col items-center gap-1 transition-all duration-300 ${activeTab === 'dashboard' ? 'text-zinc-900 -translate-y-1' : 'text-gray-400 hover:text-gray-600'}`}
            >
              <LayoutDashboard size={24} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} />
              <span className="text-[10px] font-bold">Início</span>
@@ -394,7 +452,7 @@ export default function App() {
 
            <button 
              onClick={() => setActiveTab('extract')}
-             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'extract' ? 'text-zinc-900' : 'text-gray-400 hover:text-gray-600'}`}
+             className={`flex flex-col items-center gap-1 transition-all duration-300 ${activeTab === 'extract' ? 'text-zinc-900 -translate-y-1' : 'text-gray-400 hover:text-gray-600'}`}
            >
              <ListFilter size={24} strokeWidth={activeTab === 'extract' ? 2.5 : 2} />
              <span className="text-[10px] font-bold">Extrato</span>
@@ -402,7 +460,7 @@ export default function App() {
 
            <button 
              onClick={() => setActiveTab('motivation')}
-             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'motivation' ? 'text-zinc-900' : 'text-gray-400 hover:text-gray-600'}`}
+             className={`flex flex-col items-center gap-1 transition-all duration-300 ${activeTab === 'motivation' ? 'text-zinc-900 -translate-y-1' : 'text-gray-400 hover:text-gray-600'}`}
            >
              <PiggyBank size={24} strokeWidth={activeTab === 'motivation' ? 2.5 : 2} />
              <span className="text-[10px] font-bold">Metas</span>
@@ -410,7 +468,7 @@ export default function App() {
 
            <button 
              onClick={() => setActiveTab('insights')}
-             className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'insights' ? 'text-zinc-900' : 'text-gray-400 hover:text-gray-600'}`}
+             className={`flex flex-col items-center gap-1 transition-all duration-300 ${activeTab === 'insights' ? 'text-zinc-900 -translate-y-1' : 'text-gray-400 hover:text-gray-600'}`}
            >
              <Sparkles size={24} strokeWidth={activeTab === 'insights' ? 2.5 : 2} />
              <span className="text-[10px] font-bold">Dicas</span>
